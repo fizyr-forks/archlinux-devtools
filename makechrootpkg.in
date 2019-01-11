@@ -40,6 +40,7 @@ usage() {
 	echo '-c         Clean the chroot before building'
 	echo '-d <dir>   Bind directory into build chroot as read-write'
 	echo '-D <dir>   Bind directory into build chroot as read-only'
+	echo '-N <arg>   Pass an argument to arch-snpawn'
 	echo '-u         Update the working copy of the chroot before building'
 	echo '           This is useful for rebuilds without dirtying the pristine'
 	echo '           chroot'
@@ -147,7 +148,7 @@ install_packages() {
 	pkgnames=("${install_pkgs[@]##*/}")
 
 	cp -- "${install_pkgs[@]}" "$copydir/root/"
-	arch-nspawn "$copydir" "${bindmounts_ro[@]}" "${bindmounts_rw[@]}" \
+	arch-nspawn "$copydir" "${nspawn_args[@]}" \
 		pacman -U --noconfirm -- "${pkgnames[@]/#//root/}"
 	ret=$?
 	rm -- "${pkgnames[@]/#/$copydir/root/}"
@@ -317,19 +318,19 @@ main() {
 	declare -a install_pkgs
 	declare -i ret=0
 
-	bindmounts_ro=()
-	bindmounts_rw=()
+	nspawn_args=()
 
 	copy=$USER
 	[[ -n ${SUDO_USER:-} ]] && copy=$SUDO_USER
 	[[ -z "$copy" || $copy = root ]] && copy=copy
 	src_owner=${SUDO_USER:-$USER}
 
-	while getopts 'hcur:I:l:nTD:d:U:' arg; do
+	while getopts 'hcur:I:l:nTD:d:N:U:' arg; do
 		case "$arg" in
 			c) clean_first=true ;;
-			D) bindmounts_ro+=("--bind-ro=$OPTARG") ;;
-			d) bindmounts_rw+=("--bind=$OPTARG") ;;
+			D) nspawn_args+=("--bind-ro=$OPTARG") ;;
+			d) nspawn_args+=("--bind=$OPTARG") ;;
+			N) nspawn_args+=("-c=$OPTARG") ;;
 			u) update_first=true ;;
 			r) passeddir="$OPTARG" ;;
 			I) install_pkgs+=("$OPTARG") ;;
@@ -396,7 +397,7 @@ main() {
 	fi
 
 	$update_first && arch-nspawn "$copydir" \
-			"${bindmounts_ro[@]}" "${bindmounts_rw[@]}" \
+			"${nspawn_args[@]}" \
 			pacman -Syu --noconfirm
 
 	if [[ -n ${install_pkgs[*]:-} ]]; then
@@ -418,7 +419,7 @@ main() {
 	if arch-nspawn "$copydir" \
 		--bind="$PWD:/startdir" \
 		--bind="$SRCDEST:/srcdest" \
-		"${bindmounts_ro[@]}" "${bindmounts_rw[@]}" \
+		"${nspawn_args[@]}" \
 		/chrootbuild "${makepkg_args[@]}"
 	then
 		move_products "$copydir" "$src_owner"
