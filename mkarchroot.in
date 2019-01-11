@@ -51,7 +51,9 @@ shift 1
 
 [[ -z $working_dir ]] && die 'Please specify a working directory.'
 
-if [[ -z $cache_dir ]]; then
+if [[ $cache_dir = '-' ]]; then
+	cache_dirs=()
+elif [[ -z $cache_dir ]]; then
 	cache_dirs=($(pacman -v "$cache_conf" 2>&1 | grep '^Cache Dirs:' | sed 's/Cache Dirs:\s*//g'))
 else
 	cache_dirs=(${cache_dir})

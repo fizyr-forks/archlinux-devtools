@@ -52,7 +52,9 @@ shift 1
 
 [[ -z $working_dir ]] && die 'Please specify a working directory.'
 
-if [[ -z $cache_dir ]]; then
+if [[ $cache_dir = '-' ]]; then
+	cache_dirs=()
+elif [[ -z $cache_dir ]]; then
 	cache_dirs=($(pacman -v 2>&1 | grep '^Cache Dirs:' | sed 's/Cache Dirs:\s*//g'))
 else
 	cache_dirs=("$cache_dir")
@@ -72,7 +74,9 @@ build_mount_args() {
 		mount_args+=("--bind-ro=$host_mirror_path")
 	fi
 
-	mount_args+=("--bind=${cache_dirs[0]}")
+	if [[ ${#cache_dirs[@]} -ge 1 ]]; then
+		mount_args+=("--bind=${cache_dirs[0]}")
+	fi
 
 	for cache_dir in "${cache_dirs[@]:1}"; do
 		mount_args+=("--bind-ro=$cache_dir")
@@ -92,7 +96,9 @@ copy_hostconf () {
 		cp -T "$file" "$working_dir$file"
 	done
 
-	sed -r "s|^#?\\s*CacheDir.+|CacheDir = ${cache_dirs[*]}|g" -i "$working_dir/etc/pacman.conf"
+	if [[ ${#cache_dirs[@]} -ge 1 ]]; then
+		sed -r "s|^#?\\s*CacheDir.+|CacheDir = ${cache_dirs[*]}|g" -i "$working_dir/etc/pacman.conf"
+	fi
 }
 # }}}
 
